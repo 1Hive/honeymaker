@@ -64,7 +64,7 @@ async function convertShares (
     try {
       const {
         hash
-      } = await maker.convert(tokenA, tokenB)
+      } = await maker.convert(tokenA, tokenB, { gasLimit: 660000 })
       logger.info(`- Sent transaction to convert ${tokenA}-${tokenB} pair (${hash})`)
     } catch (err) {
       logger.fatal(`- Transaction for ${tokenA}-${tokenB} pair failed to process.`)
