@@ -55,16 +55,22 @@ async function convertShares (
 ) {
   const maker = new ethers.Contract(
     makerAddress,
-    ['function ()'],
+    ['function convert (address _tokenA, address _tokenB)'],
     signer
   )
 
   logger.info('Converting shares...')
   for (const [tokenA, tokenB] of pairs) {
-    const {
-      hash
-    } = await maker.convert(tokenA, tokenB)
-    logger.info(`- Sent transaction to convert ${tokenA}-${tokenB} pair (${hash})`)
+    try {
+      const {
+        hash
+      } = await maker.convert(tokenA, tokenB)
+      logger.info(`- Sent transaction to convert ${tokenA}-${tokenB} pair (${hash})`)
+    } catch (err) {
+      logger.fatal(`- Transaction for ${tokenA}-${tokenB} pair failed to process.`)
+      logger.fatal(`- ${err.message}`)
+      process.exit(1)
+    }
   }
   logger.info('Done converting shares.')
 
@@ -76,4 +82,4 @@ async function convertShares (
   }, INTERVAL)
 }
 
-convertShares()
+convertShares(wallet, CONTRACT_ADDRESS, TOKEN_PAIRS)
