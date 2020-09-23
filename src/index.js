@@ -69,7 +69,6 @@ async function convertShares (
     } catch (err) {
       logger.fatal(`- Transaction for ${tokenA}-${tokenB} pair failed to process.`)
       logger.fatal(`- ${err.message}`)
-      process.exit(1)
     }
   }
   logger.info('Done converting shares.')
@@ -112,7 +111,6 @@ async function transferBalances (
     } catch (err) {
       logger.fatal(`- Transaction for ${proxyAddress} proxy failed to process.`)
       logger.fatal(`- ${err.message}`)
-      process.exit(1)
     }
   }
   logger.info('Done transferring balances.')
