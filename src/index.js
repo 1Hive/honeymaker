@@ -82,4 +82,48 @@ async function convertShares (
   }, INTERVAL)
 }
 
+// Honeycomb balance proxies to call
+const BALANCE_PROXIES = [
+  // HNY-WXDAI
+  '0x2dF0Af12DB95f16c33f496461bB2E38B1C860227',
+  // HNY-WETH
+  '0x23512464529127ec01a3422453a4416e6b569984',
+  // HNY-STAKE
+  '0x745963503a6489b91f7a8ff784d286877a775d72'
+]
+
+async function transferBalances (
+  signer,
+  proxies
+) {
+  logger.info('Transferring Honeycomb balances...')
+  for (const proxyAddress of proxies) {
+    const proxy = new ethers.Contract(
+      proxyAddress,
+      ['function transfer ()'],
+      signer
+    )
+
+    try {
+      const {
+        hash
+      } = await proxy.transfer({ gasLimit: 660000 })
+      logger.info(`- Sent transaction to transfer balance of ${proxyAddress} pair (${hash})`)
+    } catch (err) {
+      logger.fatal(`- Transaction for ${proxyAddress} proxy failed to process.`)
+      logger.fatal(`- ${err.message}`)
+      process.exit(1)
+    }
+  }
+  logger.info('Done transferring balances.')
+
+  const balance = await signer.provider.getBalance(signer.address)
+  logger.info(`Current balance is ${balance}`)
+
+  setTimeout(() => {
+    transferBalances(signer, proxies)
+  }, INTERVAL)
+}
+
 convertShares(wallet, CONTRACT_ADDRESS, TOKEN_PAIRS)
+transferBalances(wallet, BALANCE_PROXIES)
