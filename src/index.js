@@ -45,7 +45,11 @@ logger.info(`Calling convert on ${CONTRACT_ADDRESS} every ${INTERVAL}ms`)
 // Token pairs to convert for
 const TOKEN_PAIRS = [
   // HNY-WXDAI
-  ['0x71850b7e9ee3f13ab46d67167341e4bdc905eef9', '0xe91d153e0b41518a2ce8dd3d7944fa863463a97d']
+  ['0x71850b7e9ee3f13ab46d67167341e4bdc905eef9', '0xe91d153e0b41518a2ce8dd3d7944fa863463a97d'],
+  // HNY-WETH
+  ['0x6a023ccd1ff6f2045c3309768ead9e68f978f6e1', '0x71850b7e9ee3f13ab46d67167341e4bdc905eef9'],
+  // HNY-STAKE
+  ['0x71850b7e9ee3f13ab46d67167341e4bdc905eef9', '0xb7d311e2eb55f2f68a9440da38e7989210b9a05e']
 ]
 
 async function convertShares (
