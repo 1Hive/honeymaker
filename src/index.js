@@ -1,6 +1,7 @@
 const ethers = require('ethers')
 const logger = require('./logger')
 
+const ONE_GWEI = 1000000000
 const ONE_DAY = 24 * 60 * 60 * 1000
 
 // Configuration
@@ -66,10 +67,9 @@ async function convertShares (
   logger.info('Converting shares...')
   for (const [tokenA, tokenB] of pairs) {
     try {
-      const {
-        hash
-      } = await maker.convert(tokenA, tokenB, { gasLimit: 660000 })
-      logger.info(`- Sent transaction to convert ${tokenA}-${tokenB} pair (${hash})`)
+      const tx = await maker.convert(tokenA, tokenB, { gasPrice: ONE_GWEI, gasLimit: 1400000 })
+      logger.info(`- Sent transaction to convert ${tokenA}-${tokenB} pair (${tx.hash})`)
+      await tx.wait(2)
     } catch (err) {
       logger.fatal(`- Transaction for ${tokenA}-${tokenB} pair failed to process.`)
       logger.fatal(`- ${err.message}`)
@@ -79,10 +79,6 @@ async function convertShares (
 
   const balance = await signer.provider.getBalance(signer.address)
   logger.info(`Current balance is ${balance}`)
-
-  setTimeout(() => {
-    convertShares(signer, makerAddress, pairs)
-  }, INTERVAL)
 }
 
 // Honeycomb balance proxies to call
@@ -110,7 +106,7 @@ async function transferBalances (
     try {
       const {
         hash
-      } = await proxy.transfer({ gasLimit: 660000 })
+      } = await proxy.transfer({ gasLimit: 1400000 })
       logger.info(`- Sent transaction to transfer balance of ${proxyAddress} pair (${hash})`)
     } catch (err) {
       logger.fatal(`- Transaction for ${proxyAddress} proxy failed to process.`)
@@ -121,11 +117,15 @@ async function transferBalances (
 
   const balance = await signer.provider.getBalance(signer.address)
   logger.info(`Current balance is ${balance}`)
+}
+
+async function main () {
+  await convertShares(wallet, CONTRACT_ADDRESS, TOKEN_PAIRS)
+  await transferBalances(wallet, BALANCE_PROXIES)
 
   setTimeout(() => {
-    transferBalances(signer, proxies)
+    main()
   }, INTERVAL)
 }
 
-convertShares(wallet, CONTRACT_ADDRESS, TOKEN_PAIRS)
-transferBalances(wallet, BALANCE_PROXIES)
+main()
