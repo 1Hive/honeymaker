@@ -1,4 +1,5 @@
 const ethers = require('ethers')
+const fetch = require('node-fetch')
 const logger = require('./logger')
 
 const ONE_GWEI = 1000000000
@@ -9,6 +10,8 @@ const {
   MNEMONIC,
   ETH_URI,
   CONTRACT_ADDRESS,
+  SUBGRAPH_URI,
+  FEE_CUTOFF = 50,
   INTERVAL = ONE_DAY
 } = process.env
 
@@ -29,6 +32,11 @@ if (!CONTRACT_ADDRESS) {
 
 if (!INTERVAL) {
   logger.error('Please set `INTERVAL`.')
+  process.exit(1)
+}
+
+if (!SUBGRAPH_URI) {
+  logger.error('Please set `SUBGRAPH_URI`.')
   process.exit(1)
 }
 
@@ -53,11 +61,70 @@ const TOKEN_PAIRS = [
   ['0x71850b7e9ee3f13ab46d67167341e4bdc905eef9', '0xb7d311e2eb55f2f68a9440da38e7989210b9a05e']
 ]
 
+async function fetchPairs (
+  makerAddress
+) {
+  let liquidityPositions = []
+
+  const perPage = 20
+  let page = 0
+  while (true) {
+    const response = await fetch(SUBGRAPH_URI, {
+      method: 'post',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        query: `{
+          user(id: "${makerAddress.toLowerCase()}") {
+            liquidityPositions(
+              first: ${perPage},
+              skip: ${perPage * page},
+              orderBy: liquidityTokenBalance,
+              orderDirection: desc
+            ) {
+              pair {
+                totalSupply
+                token0 {
+                  id
+                }
+                token1 {
+                  id
+                }
+                reserveUSD
+              }
+              liquidityTokenBalance
+            } 
+          }
+        }`
+      })
+    })
+    const { data } = await response.json()
+
+    if (data.user.liquidityPositions.length === 0) {
+      break
+    }
+
+    liquidityPositions = liquidityPositions.concat(data.user.liquidityPositions)
+    page++
+  }
+
+  return liquidityPositions
+    .filter((position) => {
+      const potentialFeeUSD = Number(position.liquidityTokenBalance) / Number(position.pair.totalSupply) * position.pair.reserveUSD
+
+      return potentialFeeUSD >= FEE_CUTOFF
+    })
+    .map(({ pair }) => {
+      return [pair.token0.id, pair.token1.id]
+    })
+}
+
 async function convertShares (
   signer,
   makerAddress,
-  pairs,
 ) {
+  const pairs = await fetchPairs(makerAddress)
   const maker = new ethers.Contract(
     makerAddress,
     ['function convert (address _tokenA, address _tokenB)'],
@@ -120,7 +187,7 @@ async function transferBalances (
 }
 
 async function main () {
-  await convertShares(wallet, CONTRACT_ADDRESS, TOKEN_PAIRS)
+  await convertShares(wallet, CONTRACT_ADDRESS)
   await transferBalances(wallet, BALANCE_PROXIES)
 
   setTimeout(() => {
