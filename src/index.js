@@ -1,6 +1,7 @@
 const ethers = require('ethers')
 const fetch = require('node-fetch')
 const logger = require('./logger')
+const { chunk } = require('./util')
 
 const ONE_GWEI = 1000000000
 const ONE_DAY = 24 * 60 * 60 * 1000
@@ -84,13 +85,8 @@ async function fetchPairs (
               orderDirection: desc
             ) {
               pair {
+                id
                 totalSupply
-                token0 {
-                  id
-                }
-                token1 {
-                  id
-                }
                 reserveUSD
               }
               liquidityTokenBalance
@@ -116,7 +112,7 @@ async function fetchPairs (
       return potentialFeeUSD >= FEE_CUTOFF
     })
     .map(({ pair }) => {
-      return [pair.token0.id, pair.token1.id]
+      return pair.id
     })
 }
 
@@ -127,18 +123,21 @@ async function convertShares (
   const pairs = await fetchPairs(makerAddress)
   const maker = new ethers.Contract(
     makerAddress,
-    ['function convert (address _tokenA, address _tokenB)'],
+    ['function takeProtocolFee (address[] pairs)'],
     signer
   )
 
   logger.info('Converting shares...')
-  for (const [tokenA, tokenB] of pairs) {
+  for (const ids of chunk(pairs, 5)) {
     try {
-      const tx = await maker.convert(tokenA, tokenB, { gasPrice: ONE_GWEI, gasLimit: 1400000 })
-      logger.info(`- Sent transaction to convert ${tokenA}-${tokenB} pair (${tx.hash})`)
+      const tx = await maker.convert(ids, { gasPrice: ONE_GWEI, gasLimit: 1400000 })
+
+      for (const id of ids) {
+        logger.info(`- Sent transaction to convert ${id} pair (${tx.hash})`)
+      }
       await tx.wait(2)
     } catch (err) {
-      logger.fatal(`- Transaction for ${tokenA}-${tokenB} pair failed to process.`)
+      logger.fatal(`- Transaction for pairs (${ids.join(', ')}) failed to process.`)
       logger.fatal(`- ${err.message}`)
     }
   }
