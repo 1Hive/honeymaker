@@ -125,7 +125,7 @@ async function convertShares (
   logger.info('Converting shares...')
   for (const ids of chunk(pairs, 5)) {
     try {
-      const tx = await maker.convert(ids, { gasPrice: ONE_GWEI, gasLimit: 1400000 })
+      const tx = await maker.takeProtocolFee(ids, { gasPrice: ONE_GWEI, gasLimit: 1400000 })
 
       for (const id of ids) {
         logger.info(`- Sent transaction to convert ${id} pair (${tx.hash})`)
