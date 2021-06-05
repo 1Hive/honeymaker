@@ -13,6 +13,9 @@ Simply clone the repository, install the dependencies and configure the bot:
 - `SUBGRAPH_URI`: The Honeyswap subgraph URI to fetch liquidity position information from.
 - `FEE_CUTOFF`: The minimum fees (in USD) that will be converted as a result of burning liquidity. Defaults to $50.
 - `INTERVAL`: The interval at which the `convert` function will be called in milliseconds. Defaults to 1 day.
+- `PROTO_FEE_CHUNK_SIZE`: Specifies the number of pairs on each `takeProtocolFee` call (optional, default: 5)
+- `PROTO_FEE_GAS_LIMIT`: Specifies the gas limit for calls to the protocol fee contract (optional, default: 1.5m wei).
+- `ISSUANCE_GAS_LIMIT`: Specifies the gas limit for calls to the issuance contract (optional, default: 500k wei)
 
 ## License
 

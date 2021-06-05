@@ -8,13 +8,25 @@ const ONE_DAY = 24 * 60 * 60 * 1000
 
 // Configuration
 const {
+  // Signer
   MNEMONIC,
   ETH_URI,
+
+  // Contract addresses
   CONTRACT_ADDRESS,
   ISSUANCE_CONTRACT_ADDRESS,
+
+  // Subgraph
   SUBGRAPH_URI,
+
+  // Runtime configuration
   FEE_CUTOFF = 50,
-  INTERVAL = ONE_DAY
+  INTERVAL = ONE_DAY,
+
+  // Performance adjustments
+  PROTO_FEE_CHUNK_SIZE = 5,
+  PROTO_FEE_GAS_LIMIT = 1500000,
+  ISSUANCE_GAS_LIMIT = 500000,
 } = process.env
 
 if (!MNEMONIC) {
@@ -46,6 +58,21 @@ if (!ISSUANCE_CONTRACT_ADDRESS) {
   logger.warning('`ISSUANCE_CONTRACT_ADDRESS` is not set. Ignoring.')
 }
 
+if (!PROTO_FEE_CHUNK_SIZE) {
+  logger.fatal('Please set `PROTO_FEE_CHUNK_SIZE`.')
+  process.exit(1)
+}
+
+if (!PROTO_FEE_GAS_LIMIT) {
+  logger.fatal('Please set `PROTO_FEE_GAS_LIMIT`.')
+  process.exit(1)
+}
+
+if (!ISSUANCE_GAS_LIMIT) {
+  logger.fatal('Please set `ISSUANCE_GAS_LIMIT`.')
+  process.exit(1)
+}
+
 // Set up provider and wallet
 const provider = ethers.getDefaultProvider(ETH_URI)
 const wallet = ethers.Wallet
@@ -55,7 +82,18 @@ const wallet = ethers.Wallet
 // Run information
 logger.info(`Acting as ${wallet.address}`)
 logger.info(`Connected to ${ETH_URI}`)
-logger.info(`Calling convert on ${CONTRACT_ADDRESS} every ${INTERVAL}ms`)
+logger.info(`Calling takeProtocolFee on ${CONTRACT_ADDRESS} every ${INTERVAL}ms with ${PROTO_FEE_CHUNK_SIZE} pairs per call.`)
+
+if (ISSUANCE_CONTRACT_ADDRESS) {
+  logger.info(`Calling executeAdjustment on ${ISSUANCE_CONTRACT_ADDRESS} every ${INTERVAL}ms`)
+}
+
+logger.info(`Gas limits:`)
+logger.info(`- Fee receiver calls: ${PROTO_FEE_GAS_LIMIT} wei`)
+
+if (ISSUANCE_CONTRACT_ADDRESS) {
+  logger.info(`- Issuance calls: ${ISSUANCE_GAS_LIMIT} wei`)
+}
 
 async function fetchPairs (
   makerAddress
@@ -123,9 +161,9 @@ async function convertShares (
   )
 
   logger.info('Converting shares...')
-  for (const ids of chunk(pairs, 5)) {
+  for (const ids of chunk(pairs, PROTO_FEE_CHUNK_SIZE)) {
     try {
-      const tx = await maker.takeProtocolFee(ids, { gasPrice: ONE_GWEI, gasLimit: 1400000 })
+      const tx = await maker.takeProtocolFee(ids, { gasPrice: ONE_GWEI, gasLimit: PROTO_FEE_GAS_LIMIT })
 
       for (const id of ids) {
         logger.info(`- Sent transaction to convert ${id} pair (${tx.hash})`)
@@ -139,7 +177,7 @@ async function convertShares (
   logger.info('Done converting shares.')
 
   const balance = await signer.provider.getBalance(signer.address)
-  logger.info(`Current balance is ${balance}`)
+  logger.info(`Current balance is ${balance} wei`)
 }
 
 async function executeIssuanceAdjustment (
@@ -154,7 +192,7 @@ async function executeIssuanceAdjustment (
 
   logger.info('Executing issuance adjustment...')
   try {
-    const tx = await issuanceContract.executeAdjustment({ gasPrice: ONE_GWEI, gasLimit: 500000 })
+    const tx = await issuanceContract.executeAdjustment({ gasPrice: ONE_GWEI, gasLimit: ISSUANCE_GAS_LIMIT })
     logger.info(`- Sent transaction to execute issuance adjustment (${tx.hash})`)
     await tx.wait(2)
   } catch (err) {
@@ -164,7 +202,7 @@ async function executeIssuanceAdjustment (
   logger.info('Done executing issuance adjustment.')
 
   const balance = await signer.provider.getBalance(signer.address)
-  logger.info(`Current balance is ${balance}`)
+  logger.info(`Current balance is ${balance} wei`)
 }
 
 async function main () {
