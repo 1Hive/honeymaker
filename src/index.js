@@ -11,6 +11,7 @@ const {
   MNEMONIC,
   ETH_URI,
   CONTRACT_ADDRESS,
+  ISSUANCE_CONTRACT_ADDRESS,
   SUBGRAPH_URI,
   FEE_CUTOFF = 50,
   INTERVAL = ONE_DAY
@@ -39,6 +40,10 @@ if (!INTERVAL) {
 if (!SUBGRAPH_URI) {
   logger.error('Please set `SUBGRAPH_URI`.')
   process.exit(1)
+}
+
+if (!ISSUANCE_CONTRACT_ADDRESS) {
+  logger.warning('`ISSUANCE_CONTRACT_ADDRESS` is not set. Ignoring.')
 }
 
 // Set up provider and wallet
@@ -137,8 +142,37 @@ async function convertShares (
   logger.info(`Current balance is ${balance}`)
 }
 
+async function executeIssuanceAdjustment (
+  signer,
+  contractAddress
+) {
+  const issuanceContract = new ethers.Contract(
+    contractAddress,
+    ['function executeAdjustment ()'],
+    signer
+  )
+
+  logger.info('Executing issuance adjustment...')
+  try {
+    const tx = await issuanceContract.executeAdjustment({ gasPrice: ONE_GWEI, gasLimit: 500000 })
+    logger.info(`- Sent transaction to execute issuance adjustment (${tx.hash})`)
+    await tx.wait(2)
+  } catch (err) {
+    logger.fatal(`- Transaction to execute issuance adjustment failed.`)
+    logger.fatal(`- ${err.message}`)
+  }
+  logger.info('Done executing issuance adjustment.')
+
+  const balance = await signer.provider.getBalance(signer.address)
+  logger.info(`Current balance is ${balance}`)
+}
+
 async function main () {
   await convertShares(wallet, CONTRACT_ADDRESS)
+
+  if (ISSUANCE_CONTRACT_ADDRESS) {
+    await executeIssuanceAdjustment(wallet, ISSUANCE_CONTRACT_ADDRESS)
+  }
 
   setTimeout(() => {
     main()
